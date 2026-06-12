@@ -366,3 +366,6 @@ FodyWeavers.xsd
 
 # course material
 docs/spec.pdf
+
+# runtime data (앱 실행 시 자동 생성)
+SampleOrderSystem-jsjason/data/
