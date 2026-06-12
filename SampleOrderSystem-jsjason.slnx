@@ -3,5 +3,5 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
-  <Project Path="SampleOrderSystem-jsjason/SampleOrderSystem-jsjason.vcxproj" />
+  <Project Path="SampleOrderSystem-jsjason/SampleOrderSystem-jsjason.vcxproj" Id="a329a710-14bb-4567-8ee1-c60f17e31564" />
 </Solution>
