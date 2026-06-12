@@ -7,7 +7,8 @@
 
 using namespace Color;
 
-void MainView::showMenu(int sampleCount, int totalStock) const {
+void MainView::showMenu(int sampleCount, int totalStock,
+                         int orderCount,  int queueCount) const {
     clearScreen();
 
     std::time_t now = std::time(nullptr);
@@ -24,12 +25,14 @@ void MainView::showMenu(int sampleCount, int totalStock) const {
     std::cout << "  " << TITLE << "S-Semi 시료 생산주문관리 시스템" << RESET << "\n";
     std::cout << "  " << SEP << timeBuf << RESET << "\n";
     std::cout << "  시료: " << SECTION << sampleCount << "개" << RESET
-              << "    총 재고: " << SECTION << totalStock << " ea" << RESET << "\n";
+              << "    총 재고: " << SECTION << totalStock << " ea" << RESET
+              << "    주문: "    << SECTION << orderCount << "건" << RESET
+              << "    생산 대기: " << SECTION << queueCount << "건" << RESET << "\n";
     std::cout << SEP << "===========================================" << RESET << "\n";
     std::cout << "  " << LABEL << "[1]" << RESET << " 시료 관리\n";
     std::cout << "  " << LABEL << "[2]" << RESET << " 시료 주문\n";
     std::cout << "  " << LABEL << "[3]" << RESET << " 주문 승인/거절\n";
-    std::cout << "  " << LABEL << "[4]" << RESET << " 모니터링             " << SEP << "(준비 중)" << RESET << "\n";
+    std::cout << "  " << LABEL << "[4]" << RESET << " 모니터링\n";
     std::cout << "  " << LABEL << "[5]" << RESET << " 생산라인 조회\n";
     std::cout << "  " << LABEL << "[6]" << RESET << " 출고 처리\n";
     std::cout << "  " << LABEL << "[0]" << RESET << " 종료\n";

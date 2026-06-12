@@ -13,10 +13,12 @@
 #include "View/OrderView.h"
 #include "View/ProductionView.h"
 #include "View/ReleaseView.h"
+#include "View/MonitorView.h"
 #include "Controller/SampleController.h"
 #include "Controller/OrderController.h"
 #include "Controller/ProductionController.h"
 #include "Controller/ReleaseController.h"
+#include "Controller/MonitorController.h"
 #include "Controller/AppController.h"
 #endif
 
@@ -50,9 +52,13 @@ int main(int argc, char* argv[]) {
     ReleaseView          releaseView;
     ReleaseController    releaseCtrl(sampleRepo, orderRepo, releaseView);
 
+    MonitorView          monitorView;
+    MonitorController    monitorCtrl(sampleRepo, orderRepo, prodQueue, monitorView);
+
     MainView             mainView;
     AppController        app(sampleRepo, orderRepo, prodQueue,
-                             sampleCtrl, orderCtrl, productionCtrl, releaseCtrl, mainView);
+                             sampleCtrl, orderCtrl, productionCtrl,
+                             releaseCtrl, monitorCtrl, mainView);
 
     app.run();
     return 0;
