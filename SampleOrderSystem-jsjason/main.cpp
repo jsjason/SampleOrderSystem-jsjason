@@ -11,8 +11,10 @@
 #include "View/MainView.h"
 #include "View/SampleView.h"
 #include "View/OrderView.h"
+#include "View/ProductionView.h"
 #include "Controller/SampleController.h"
 #include "Controller/OrderController.h"
+#include "Controller/ProductionController.h"
 #include "Controller/AppController.h"
 #endif
 
@@ -30,18 +32,22 @@ int main(int argc, char* argv[]) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 #else
-    SampleRepository  sampleRepo("data/samples.json");
-    OrderRepository   orderRepo("data/orders.json");
-    ProductionQueue   prodQueue("data/production.json");
+    SampleRepository     sampleRepo("data/samples.json");
+    OrderRepository      orderRepo("data/orders.json");
+    ProductionQueue      prodQueue("data/production.json");
 
-    SampleView        sampleView;
-    SampleController  sampleCtrl(sampleRepo, sampleView);
+    SampleView           sampleView;
+    SampleController     sampleCtrl(sampleRepo, orderRepo, prodQueue, sampleView);
 
-    OrderView         orderView;
-    OrderController   orderCtrl(sampleRepo, orderRepo, prodQueue, orderView);
+    OrderView            orderView;
+    OrderController      orderCtrl(sampleRepo, orderRepo, prodQueue, orderView);
 
-    MainView          mainView;
-    AppController     app(sampleRepo, sampleCtrl, orderCtrl, mainView);
+    ProductionView       productionView;
+    ProductionController productionCtrl(sampleRepo, orderRepo, prodQueue, productionView);
+
+    MainView             mainView;
+    AppController        app(sampleRepo, orderRepo, prodQueue,
+                             sampleCtrl, orderCtrl, productionCtrl, mainView);
 
     app.run();
     return 0;

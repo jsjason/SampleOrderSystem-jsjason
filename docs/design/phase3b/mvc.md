@@ -34,6 +34,7 @@ SampleOrderSystem-jsjason/
 | `AppController::run()` 루프 **상단** | 모든 화면 이동 전 공통 적용 |
 | `OrderController::runApproval()` **진입 직후** | 승인 화면에서 시료 재고를 직접 확인 |
 | `ProductionController::run()` 루프 **상단** | 생산라인 화면에서 큐 상태 표시 |
+| `SampleController::run()` 루프 **상단** | 시료 관리 화면에서 재고 조회 시 최신 생산분 반영 |
 | `MonitorController::run()` 루프 **상단** | Phase 4 구현 시 추가 |
 
 ---
@@ -158,13 +159,15 @@ void AppController::run() {
 
 ### 헤더 / 생성자 변경
 
-`ProductionController`를 멤버로 추가한다.
-`prodQueue_`도 직접 참조해야 하므로 생성자에 추가한다.
+`ProductionController`와 `OrderRepository`를 멤버로 추가한다.
+`prodQueue_.processCompleted(sampleRepo_, orderRepo_)` 호출에 `OrderRepository`가 필요하므로
+생성자 파라미터에 명시적으로 추가한다.
 
 ```cpp
 class AppController {
 public:
     AppController(SampleRepository&     sampleRepo,
+                  OrderRepository&      orderRepo,         // Phase 3b 추가
                   ProductionQueue&      prodQueue,         // Phase 3b 추가
                   SampleController&     sampleCtrl,
                   OrderController&      orderCtrl,
@@ -173,19 +176,14 @@ public:
     void run();
 private:
     SampleRepository&     sampleRepo_;
+    OrderRepository&      orderRepo_;                      // Phase 3b 추가
     ProductionQueue&      prodQueue_;                      // Phase 3b 추가
-    OrderRepository&      orderRepo_;                      // processCompleted 인자
     SampleController&     sampleCtrl_;
     OrderController&      orderCtrl_;
     ProductionController& productionCtrl_;                 // Phase 3b 추가
     MainView&             mainView_;
 };
 ```
-
-> `AppController`가 `OrderRepository`도 참조해야 `processCompleted()`를 호출할 수 있다.
-> 생성자 파라미터에 추가하거나, `prodQueue_`의 `processCompleted` 호출을
-> 각 서브컨트롤러로 위임하는 방식도 가능하다.
-> **권장**: `AppController` 생성자에 `OrderRepository&`를 추가. `main.cpp`에서 주입.
 
 ---
 
@@ -207,7 +205,9 @@ void OrderController::runApproval() {
 
 ## `applyApproval()` 수정
 
-`enqueue()` 시그니처 변경에 따라 `avgProductionTime`을 추가로 전달한다.
+### `enqueue()` 시그니처 변경
+
+`avgProductionTime`을 추가로 전달한다.
 
 ```cpp
 // Phase 3a
@@ -219,6 +219,68 @@ prodQueue.enqueue(orderNumber, order.sampleId, actualQty, sample.avgProductionTi
 
 `applyApproval()`은 이미 `sample` 객체를 보유하고 있으므로 변경이 최소화된다.
 
+### 생산 중 주문 선점 재고 계산 (Phase 3b 추가)
+
+동일 시료에 대해 PRODUCING 상태의 주문이 이미 존재하면,
+해당 주문이 완료 시 차감할 수량은 현재 재고에서 **선점**된 것으로 간주해야 한다.
+따라서 `availableStock = max(0, sample.stock - reserved)` 를 구하여
+재고 충분/부족 판단에 사용한다.
+
+```cpp
+// 생산 큐의 모든 작업에서 선점 수량 합산
+int reserved = 0;
+for (const auto& job : prodQueue.getAll()) {
+    auto pending = orderRepo.findByNumber(job.orderNumber);
+    if (pending.has_value())
+        reserved += pending->quantity;
+}
+int availableStock = std::max(0, sample.stock - reserved);
+
+// 기존: if (sample.stock >= order.quantity)
+if (availableStock >= order.quantity) { /* CONFIRMED */ }
+int shortage = order.quantity - availableStock;
+```
+
+`runApproval()`(View 표시용)과 `applyApproval()`(승인 로직) 양쪽 모두 동일한 방식으로 계산한다.
+
+---
+
+## `promptApprovalDecision()` 시그니처 변경
+
+`availableStock`을 View에도 전달하여 "재고 충분/부족" 문구를 실제 가용 재고 기준으로 표시한다.
+
+```cpp
+// Phase 3a
+int promptApprovalDecision(const Order& order, const Sample& sample) const;
+
+// Phase 3b (변경 후)
+int promptApprovalDecision(const Order& order, const Sample& sample,
+                           int availableStock) const;
+```
+
+View 내부에서 `reserved = sample.stock - availableStock`을 역산하여
+"생산 중 주문 선점 N ea" 라인을 조건부로 표시한다.
+
+---
+
+## `SampleController` 수정
+
+시료 관리 화면에서 재고 조회 시 최신 생산 완료분을 반영하기 위해
+`SampleController`가 `OrderRepository`와 `ProductionQueue`도 참조한다.
+
+```cpp
+// Phase 3a
+SampleController(SampleRepository& sampleRepo, SampleView& view);
+
+// Phase 3b (변경 후)
+SampleController(SampleRepository& sampleRepo,
+                 OrderRepository&  orderRepo,
+                 ProductionQueue&  prodQueue,
+                 SampleView&       view);
+```
+
+`run()` 루프 상단에 `prodQueue_.processCompleted(sampleRepo_, orderRepo_)` 호출 추가.
+
 ---
 
 ## `main.cpp` — Release 분기 수정
@@ -229,7 +291,7 @@ OrderRepository     orderRepo("data/orders.json");
 ProductionQueue     prodQueue("data/production.json");
 
 SampleView          sampleView;
-SampleController    sampleCtrl(sampleRepo, sampleView);
+SampleController    sampleCtrl(sampleRepo, orderRepo, prodQueue, sampleView);
 
 OrderView           orderView;
 OrderController     orderCtrl(sampleRepo, orderRepo, prodQueue, orderView);

@@ -28,7 +28,8 @@ public:
     void showReservedList(const std::vector<Order>& orders,
                           const std::vector<std::string>& sampleNames) const;
     int  promptOrderSelection(int count) const;
-    int  promptApprovalDecision(const Order& order, const Sample& sample) const;
+    int  promptApprovalDecision(const Order& order, const Sample& sample,
+                                int availableStock) const;
     void showApprovalConfirmed(const Order& order) const;
     void showApprovalProducing(const Order& order, int shortage, int actualQty) const;
     void showRejected(const Order& order) const;

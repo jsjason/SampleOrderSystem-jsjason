@@ -83,24 +83,45 @@ void processCompleted(SampleRepository& sampleRepo,
 
 ### 처리 흐름
 
+생산 완료를 일괄 처리하지 않고, **호출될 때마다 경과 시간에 비례하여 재고를 점진적으로 반영**한다.
+`creditedQuantity`가 이미 재고에 반영된 수량을 추적하므로 중복 반영이 없다.
+
 ```
 while jobs_ 비어있지 않음:
     job = jobs_.front()
     startedAt_t = parseDateTime(job.startedAt)
+    elapsed = difftime(now, startedAt_t)
 
-    if difftime(now, startedAt_t) < job.totalDuration:
+    if elapsed < 0:
+        break
+
+    // 점진적 재고 반영
+    if job.actualQuantity > 0 and job.totalDuration > 0:
+        timePerItem  = job.totalDuration / job.actualQuantity    // 개당 생산 소요시간(초)
+        producedSoFar = min(floor(elapsed / timePerItem), job.actualQuantity)
+    else:
+        producedSoFar = 0
+
+    newlyProduced = producedSoFar - job.creditedQuantity
+    if newlyProduced > 0:
+        sampleRepo.addStock(job.sampleId, newlyProduced)
+        job.creditedQuantity += newlyProduced
+        save()
+
+    if producedSoFar < job.actualQuantity:
         break   // 순차 처리: 맨 앞이 미완료이면 나머지도 미완료
 
-    // 완료 처리
-    order = orderRepo.findByNumber(job.orderNumber).value()
-    sampleRepo.addStock(job.sampleId, job.actualQuantity)   // 생산분 재고 추가
-    sampleRepo.deductStock(job.sampleId, order.quantity)    // 주문분 재고 차감
-    orderRepo.updateStatus(job.orderNumber, CONFIRMED)
+    // 작업 완료 처리
+    order = orderRepo.findByNumber(job.orderNumber)
+    if order.has_value():
+        sampleRepo.deductStock(job.sampleId, order.quantity)    // 주문분 재고 차감
+        orderRepo.updateStatus(job.orderNumber, CONFIRMED)
+
     jobs_.erase(jobs_.begin())
     save()
 ```
 
-`break` 없이 루프를 계속하므로 복수 작업이 동시에 완료 조건을 충족하면 모두 처리된다.
+복수 작업이 동시에 완료 조건을 충족하면 루프가 계속 돌아 모두 처리된다.
 
 ---
 
@@ -136,6 +157,19 @@ static std::string formatDateTime(std::time_t t) {
 ## 업데이트된 `ProductionQueue` 선언 요약
 
 ```cpp
+struct ProductionJob {
+    std::string orderNumber;
+    std::string sampleId;
+    int         actualQuantity;
+    std::string enqueuedAt;
+    std::string startedAt;
+    double      totalDuration;
+    int         creditedQuantity = 0;  // 재고에 이미 반영된 수량 (Phase 3b 추가)
+
+    nlohmann::json toJson() const;
+    static ProductionJob fromJson(const nlohmann::json& j);
+};
+
 class ProductionQueue {
 public:
     explicit ProductionQueue(const std::string& filePath);
@@ -196,7 +230,7 @@ q.processCompleted(sampleRepo, orderRepo, future);
 | `부족분과_수율로_실_생산량을_계산한다` | `calculateActualQuantity(shortage, yield)` 반환값 확인 |
 | `수율_0_92_부족분_170일때_실생산량은_206이다` | `ceil(170 / (0.92 × 0.9))` = 206 확인 |
 | `총_생산시간은_평균생산시간_분_곱하기_실생산량_곱하기_60초이다` | `front()->totalDuration == avgProductionTime * qty * 60.0` |
-| `부족분이_0이면_생산_작업을_등록하지_않는다` | `applyApproval()` 후 `prodQueue.empty() == true` (재고 충분 경로) |
+| `부족분이_0이면_실생산량은_0이다` | `calculateActualQuantity(0, yield) == 0` (shortage ≤ 0 조기 반환) |
 | `경과_시간이_충분하면_완료_작업이_자동_처리된다` | `future = startedAt + totalDuration + 1` 주입 → `empty() == true` |
 | `순차_처리시_다음_작업의_startedAt은_이전_작업_완료시각이다` | 2건 enqueue → 두 번째 `startedAt == 첫 번째 startedAt + 첫 번째 totalDuration` |
 | `경과_시간이_부족하면_작업이_처리되지_않는다` | `now = startedAt + totalDuration - 1` → `empty() == false` |

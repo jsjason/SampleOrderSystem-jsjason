@@ -1,4 +1,5 @@
 #include "OrderController.h"
+#include <algorithm>
 
 // -----------------------------------------------------------------------
 // 자유 함수 — 승인/거절 핵심 로직
@@ -11,15 +12,24 @@ ApprovalResult applyApproval(const std::string& orderNumber,
     auto order  = orderRepo.findByNumber(orderNumber).value();
     auto sample = sampleRepo.findById(order.sampleId).value();
 
-    if (sample.stock >= order.quantity) {
+    // 생산 중인 주문들이 완료 시 차감할 수량 합산 → 해당 재고는 이미 선점됨
+    int reserved = 0;
+    for (const auto& job : prodQueue.getAll()) {
+        auto pendingOrder = orderRepo.findByNumber(job.orderNumber);
+        if (pendingOrder.has_value())
+            reserved += pendingOrder->quantity;
+    }
+    int availableStock = std::max(0, sample.stock - reserved);
+
+    if (availableStock >= order.quantity) {
         sampleRepo.deductStock(order.sampleId, order.quantity);
         orderRepo.updateStatus(orderNumber, OrderStatus::CONFIRMED);
         return { OrderStatus::CONFIRMED, 0, 0 };
     }
 
-    int shortage  = order.quantity - sample.stock;
+    int shortage  = order.quantity - availableStock;
     int actualQty = calculateActualQuantity(shortage, sample.yield);
-    prodQueue.enqueue(orderNumber, order.sampleId, actualQty);
+    prodQueue.enqueue(orderNumber, order.sampleId, actualQty, sample.avgProductionTime);
     orderRepo.updateStatus(orderNumber, OrderStatus::PRODUCING);
     return { OrderStatus::PRODUCING, shortage, actualQty };
 }
@@ -56,6 +66,7 @@ void OrderController::run() {
 }
 
 void OrderController::runApproval() {
+    prodQueue_.processCompleted(sampleRepo_, orderRepo_);
     auto orders = orderRepo_.filterByStatus(OrderStatus::RESERVED);
     if (orders.empty()) {
         view_.showNoReservedOrders();
@@ -75,9 +86,17 @@ void OrderController::runApproval() {
         return;
     }
 
-    const Order& order    = orders[idx - 1];
-    auto         sample   = sampleRepo_.findById(order.sampleId).value();
-    int          decision = view_.promptApprovalDecision(order, sample);
+    const Order& order  = orders[idx - 1];
+    auto         sample = sampleRepo_.findById(order.sampleId).value();
+
+    int reserved = 0;
+    for (const auto& job : prodQueue_.getAll()) {
+        auto pending = orderRepo_.findByNumber(job.orderNumber);
+        if (pending.has_value())
+            reserved += pending->quantity;
+    }
+    int availableStock = std::max(0, sample.stock - reserved);
+    int decision = view_.promptApprovalDecision(order, sample, availableStock);
     switch (decision) {
         case 1: handleApprove(order); break;
         case 2: handleReject(order);  break;

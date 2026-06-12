@@ -189,8 +189,10 @@ int OrderView::promptOrderSelection(int count) const {
     return choice;
 }
 
-int OrderView::promptApprovalDecision(const Order& order, const Sample& sample) const {
-    int shortage = order.quantity - sample.stock;
+int OrderView::promptApprovalDecision(const Order& order, const Sample& sample,
+                                       int availableStock) const {
+    int reserved = sample.stock - availableStock;
+    int shortage  = order.quantity - availableStock;
 
     printSep();
     std::cout << "  " << SECTION << "주문 상세" << RESET << "\n";
@@ -202,6 +204,10 @@ int OrderView::promptApprovalDecision(const Order& order, const Sample& sample) 
     std::cout << "  " << SEP << "시료명        : " << RESET << sample.name
               << "  " << SEP << "(" << sample.id << ")" << RESET << "\n";
     std::cout << "  " << SEP << "현재 재고     : " << RESET << SECTION << sample.stock << " ea" << RESET << "\n";
+    if (reserved > 0)
+        std::cout << "  " << SEP << "가용 재고     : " << RESET
+                  << SECTION << availableStock << " ea" << RESET
+                  << SEP << "  (생산 중 주문 선점: " << reserved << " ea)" << RESET << "\n";
     if (shortage > 0)
         std::cout << "  " << ERR  << "부족분        : " << shortage << " ea" << RESET << "\n";
     else

@@ -176,19 +176,23 @@ JSON 파일 영속성이 동작해야 하며, 프로그램 재시작 후에도 �
 
 - `AppController::run()` 루프 상단 — 모든 화면 이동 전 공통 적용
 - `OrderController::runApproval()` 진입 시 — 승인 화면에서 시료 재고를 직접 확인
-- `MonitorController::run()` 루프 상단 — 모니터링 화면에서 시료별 재고 현황 표시
+- `SampleController::run()` 루프 상단 — 시료 관리 화면에서 재고 조회 시 최신 반영
 - `ProductionController::run()` 루프 상단 — 생산라인 조회 화면
+- `MonitorController::run()` 루프 상단 — 모니터링 화면에서 시료별 재고 현황 표시 (Phase 4)
 
-**순차 처리 시간 계산**:
-- 큐 앞 작업의 `startedAt + totalDuration <= now` → 완료 처리
+**생산 진행 중 점진적 재고 반영**:
+- `processCompleted()` 호출마다 `producedSoFar = floor(elapsed / timePerItem)` 계산
+- `creditedQuantity` (이미 반영된 수량)와의 차이만큼 `addStock()` 호출 → 중복 없음
+- 전체 `actualQuantity` 생산 완료 시: 주문 수량 차감, 상태 `PRODUCING → CONFIRMED`, 큐에서 제거
 - 다음 작업의 `startedAt` = 이전 작업의 `startedAt + totalDuration` (now 기준 아님)
-- 폴링이 늦어도 시간 계산 정확성 보장; 복수 작업이 동시에 완료될 수 있음
+- 폴링이 늦어도 시간 계산 정확성 보장; 복수 작업이 동시에 완료 가능
+
+**생산 중 주문 재고 선점**:
+- `applyApproval()` 및 `runApproval()` 시, PRODUCING 큐의 모든 주문 수량을 합산하여 선점 재고로 처리
+- `availableStock = max(0, sample.stock - reserved)` 로 실제 가용 재고 계산
 
 **실 생산량 계산**: `ceil(부족분 / (수율 × 0.9))`
 **총 생산시간**: `avgProductionTime(분/ea) × actualQuantity × 60.0` → `totalDuration` (단위: 초)
-- `avgProductionTime`은 `Sample.h` 기준 분/ea
-- `totalDuration`을 초 단위로 변환하여 저장하면 `std::time_t` 차이값과 직접 비교 가능
-- 비교: `std::difftime(now, parsedStartedAt) >= totalDuration`
 
 ### 테스트 전략 — 시간 주입
 
@@ -236,23 +240,25 @@ totalDuration     = 0.01 × 10 × 60 = 6초
 | `Controller/AppController` (수정) | 루프 상단에 `processCompleted()` 호출, [5] 생산라인 조회 메뉴 연결 |
 | `Controller/OrderController` (수정) | `runApproval()` 진입 시 `processCompleted()` 호출 |
 
-### 통과 단위 테스트 (10개)
+### 통과 단위 테스트 (12개)
 
 `Tests/ProductionQueueTest.cpp` (4개)
 - `ProductionCalculation.부족분과_수율로_실_생산량을_계산한다`
 - `ProductionCalculation.수율_0_92_부족분_170일때_실생산량은_206이다`
 - `ProductionCalculation.총_생산시간은_평균생산시간_분_곱하기_실생산량_곱하기_60초이다`
-- `ProductionCalculation.부족분이_0이면_생산_작업을_등록하지_않는다`
+- `ProductionCalculation.부족분이_0이면_실생산량은_0이다`
 
 `Tests/ProductionQueueTest.cpp` — 자동 완료 (3개)
 - `ProductionQueue.경과_시간이_충분하면_완료_작업이_자동_처리된다`
 - `ProductionQueue.순차_처리시_다음_작업의_startedAt은_이전_작업_완료시각이다`
 - `ProductionQueue.경과_시간이_부족하면_작업이_처리되지_않는다`
 
-`Tests/OrderApprovalTest.cpp` (3개)
+`Tests/OrderApprovalTest.cpp` (5개)
 - `OrderApproval.생산_완료시_PRODUCING에서_CONFIRMED로_전환된다`
 - `OrderApproval.생산_완료시_시료_재고가_실생산량만큼_증가한다`
 - `OrderApproval.생산_완료시_재고에서_주문량만큼_차감된다`
+- `OrderApproval.생산중인_주문이_있으면_해당_수량을_제외한_가용재고로_판단한다`
+- `OrderApproval.생산중_주문_차감_후_가용재고가_충분하면_새_주문은_CONFIRMED이다`
 
 ### 수동 테스트 시나리오 (Release 빌드)
 
@@ -323,7 +329,7 @@ totalDuration     = 0.01 × 10 × 60 = 6초
 | Phase 1  | SampleRepository 10개 | **10 / 46** |
 | Phase 2  | OrderRepository 6개 | **16 / 46** |
 | Phase 3a | OrderRepository 5개 + ProductionQueue 5개 + OrderApproval 9개 | **35 / 46** |
-| Phase 3b | ProductionCalculation 4개 + ProductionQueue(자동완료) 3개 + OrderApproval(생산완료) 3개 | **45 / 46** |
-| Phase 4  | OrderApproval 1개 | **46 / 46** |
+| Phase 3b | ProductionCalculation 4개 + ProductionQueue(자동완료) 3개 + OrderApproval(생산완료+재고선점) 5개 | **47 / 48** |
+| Phase 4  | OrderApproval 1개 | **48 / 48** |
 
-Phase 4 완료 시 전체 46개 테스트 PASS, 0개 SKIPPED.
+Phase 4 완료 시 전체 48개 테스트 PASS, 0개 SKIPPED.

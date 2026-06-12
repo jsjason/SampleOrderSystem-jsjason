@@ -150,12 +150,15 @@ RESERVED   ← 주문 접수 (초기 상태)
 ```
 승인 요청 (RESERVED 주문)
     ↓
-재고 확인: stock >= quantity ?
+가용 재고 계산: availableStock = max(0, stock - reserved)
+    (* reserved = PRODUCING 상태 주문들의 수량 합산 — 이미 생산에 선점된 재고)
+    ↓
+가용 재고 확인: availableStock >= quantity ?
     ├── YES → stock -= quantity
     │         상태 = CONFIRMED
-    └── NO  → 부족분 = quantity - stock
+    └── NO  → 부족분 = quantity - availableStock
               실 생산량 = ceil(부족분 / (수율 × 0.9))
-              총 생산 시간 = 평균 생산시간 × 실 생산량 (min)
+              총 생산 시간 = 평균 생산시간 × 실 생산량 × 60.0 (초)
               생산 큐 등록 (FIFO)
               상태 = PRODUCING
 ```
@@ -211,14 +214,17 @@ RESERVED   ← 주문 접수 (초기 상태)
 
 자동 점검 시점:
 - 메인 메뉴 진입 시 (모든 화면 이동 전 공통 적용)
+- 시료 관리 화면 진입 시
 - 주문 승인/거절 화면 진입 시
-- 모니터링 화면 진입 시
 - 생산라인 조회 화면 진입 시
+- 모니터링 화면 진입 시
 
-완료 처리 내용:
-1. `stock += 실 생산량`
-2. `stock -= 주문 수량` (재고에서 주문분 차감)
-3. 주문 상태: `PRODUCING → CONFIRMED`
+**점진적 재고 반영**: 생산이 완료되기 전에도, 경과 시간에 비례하여 생산된 수량만큼 재고가 점진적으로 증가한다.
+(`producedSoFar = floor(경과시간 / 개당생산시간)`, 이미 반영된 수량은 `creditedQuantity`로 추적하여 중복 방지)
+
+완료 처리 내용 (전체 실 생산량 생산 완료 시):
+1. `stock -= 주문 수량` (재고에서 주문분 차감)
+2. 주문 상태: `PRODUCING → CONFIRMED`
 
 #### 생산 현황 표기
 
@@ -229,12 +235,13 @@ RESERVED   ← 주문 접수 (초기 상태)
 
 | 필드 | 설명 |
 |------|------|
-| `orderId` | 연결된 주문번호 |
+| `orderNumber` | 연결된 주문번호 |
 | `sampleId` | 생산할 시료 ID |
-| `shortage` | 부족분 (주문량 - 재고) |
-| `actualProduction` | 실 생산량 |
-| `totalTime` | 총 생산 시간 (min) |
+| `actualQuantity` | 실 생산량 (ea) |
+| `totalDuration` | 총 생산 소요시간 (초, `avgProductionTime × actualQuantity × 60.0`) |
 | `enqueuedAt` | 큐 등록 일시 |
+| `startedAt` | 생산 시작 일시 (직전 작업 완료 시각 기준 순차 계산) |
+| `creditedQuantity` | 재고에 이미 반영된 수량 (점진적 재고 반영 중복 방지용) |
 
 ---
 
