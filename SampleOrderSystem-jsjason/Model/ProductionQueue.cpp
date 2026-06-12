@@ -145,10 +145,9 @@ void ProductionQueue::processCompleted(SampleRepository& sampleRepo,
         // 전체 생산 완료 여부 확인
         if (producedSoFar < jobs_.front().actualQuantity) break;
 
-        // 완료 처리: 주문량 차감, 상태 변경, 큐에서 제거
+        // 완료 처리: 상태 변경, 큐에서 제거 (재고 차감은 출고 시점에 수행)
         auto order = orderRepo.findByNumber(jobs_.front().orderNumber);
         if (order.has_value()) {
-            sampleRepo.deductStock(jobs_.front().sampleId, order->quantity);
             orderRepo.updateStatus(jobs_.front().orderNumber, OrderStatus::CONFIRMED);
         }
         jobs_.erase(jobs_.begin());

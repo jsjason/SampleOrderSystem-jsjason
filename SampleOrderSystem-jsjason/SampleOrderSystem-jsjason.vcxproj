@@ -151,9 +151,11 @@
     <ClCompile Include="View\SampleView.cpp" />
     <ClCompile Include="View\OrderView.cpp" />
     <ClCompile Include="View\ProductionView.cpp" />
+    <ClCompile Include="View\ReleaseView.cpp" />
     <ClCompile Include="Controller\SampleController.cpp" />
     <ClCompile Include="Controller\OrderController.cpp" />
     <ClCompile Include="Controller\ProductionController.cpp" />
+    <ClCompile Include="Controller\ReleaseController.cpp" />
     <ClCompile Include="Controller\AppController.cpp" />
     <ClCompile Include="Tests\SampleRepositoryTest.cpp" />
     <ClCompile Include="Tests\OrderRepositoryTest.cpp" />
@@ -170,9 +172,11 @@
     <ClInclude Include="View\SampleView.h" />
     <ClInclude Include="View\OrderView.h" />
     <ClInclude Include="View\ProductionView.h" />
+    <ClInclude Include="View\ReleaseView.h" />
     <ClInclude Include="Controller\SampleController.h" />
     <ClInclude Include="Controller\OrderController.h" />
     <ClInclude Include="Controller\ProductionController.h" />
+    <ClInclude Include="Controller\ReleaseController.h" />
     <ClInclude Include="Controller\AppController.h" />
   </ItemGroup>
   <ItemGroup>

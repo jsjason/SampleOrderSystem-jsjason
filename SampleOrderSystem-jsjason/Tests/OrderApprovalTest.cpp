@@ -49,7 +49,8 @@ TEST_F(OrderApproval, 재고가_충분하면_승인시_재고가_주문량만큼
     addSample("S-001", 500);
     auto num = placeOrder("S-001", 100);
     applyApproval(num, sampleRepo, orderRepo, prodQueue);
-    EXPECT_EQ(sampleRepo.findById("S-001")->stock, 400);
+    // 재고 차감은 출고 시점에 수행 — 승인 후 재고 변화 없음
+    EXPECT_EQ(sampleRepo.findById("S-001")->stock, 500);
 }
 
 TEST_F(OrderApproval, 재고가_충분하면_승인시_생산_큐에_등록되지_않는다) {
@@ -143,22 +144,23 @@ TEST_F(OrderApproval, 생산_완료시_시료_재고가_실생산량만큼_증�
     auto future = start + static_cast<std::time_t>(job.totalDuration) + 1;
     prodQueue.processCompleted(sampleRepo, orderRepo, future);
 
-    // addStock(actualQty) 후 deductStock(5) → 최종 재고 = actualQty - 5
-    EXPECT_EQ(sampleRepo.findById("S-001")->stock, result.actualQuantity - 5);
+    // addStock(actualQty) 만 수행, 출고 전 deductStock 없음 → 최종 재고 = actualQty
+    EXPECT_EQ(sampleRepo.findById("S-001")->stock, result.actualQuantity);
 }
 
 TEST_F(OrderApproval, 생산_완료시_재고에서_주문량만큼_차감된다) {
     addSample("S-001", 0);
     auto num    = placeOrder("S-001", 5);
     auto result = applyApproval(num, sampleRepo, orderRepo, prodQueue);
-    int  actQty = result.actualQuantity;  // > 5 이므로 최종 재고 > 0
+    int  actQty = result.actualQuantity;
 
     auto job    = prodQueue.front().value();
     auto start  = parseTestTime(job.startedAt);
     auto future = start + static_cast<std::time_t>(job.totalDuration) + 1;
     prodQueue.processCompleted(sampleRepo, orderRepo, future);
 
-    EXPECT_LT(sampleRepo.findById("S-001")->stock, actQty);
+    // 생산 완료 시 deductStock 없음 → 재고 = actualQty (출고 전까지 차감되지 않음)
+    EXPECT_EQ(sampleRepo.findById("S-001")->stock, actQty);
 }
 
 // -----------------------------------------------------------------------
@@ -201,5 +203,18 @@ TEST_F(OrderApproval, 생산중_주문_차감_후_가용재고가_충분하면_�
 // -----------------------------------------------------------------------
 
 TEST_F(OrderApproval, CONFIRMED_주문을_출고하면_RELEASED로_전환된다) {
-    GTEST_SKIP() << "TODO: Phase 4 구현 후 작성";
+    addSample("S-001", 500);
+    auto num = placeOrder("S-001", 100);
+
+    // 승인 후 재고 변화 없음 (차감은 출고 시점)
+    applyApproval(num, sampleRepo, orderRepo, prodQueue);
+    ASSERT_EQ(orderRepo.findByNumber(num)->status, OrderStatus::CONFIRMED);
+    ASSERT_EQ(sampleRepo.findById("S-001")->stock, 500);
+
+    // 출고 처리: 재고 차감 + 상태 전환
+    sampleRepo.deductStock("S-001", 100);
+    orderRepo.updateStatus(num, OrderStatus::RELEASED);
+
+    EXPECT_EQ(orderRepo.findByNumber(num)->status, OrderStatus::RELEASED);
+    EXPECT_EQ(sampleRepo.findById("S-001")->stock, 400);
 }

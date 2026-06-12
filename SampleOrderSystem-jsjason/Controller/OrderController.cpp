@@ -12,17 +12,21 @@ ApprovalResult applyApproval(const std::string& orderNumber,
     auto order  = orderRepo.findByNumber(orderNumber).value();
     auto sample = sampleRepo.findById(order.sampleId).value();
 
-    // 생산 중인 주문들이 완료 시 차감할 수량 합산 → 해당 재고는 이미 선점됨
+    // PRODUCING 선점: 생산 완료 시 이 수량이 출고되므로 선점으로 간주
     int reserved = 0;
     for (const auto& job : prodQueue.getAll()) {
         auto pendingOrder = orderRepo.findByNumber(job.orderNumber);
         if (pendingOrder.has_value())
             reserved += pendingOrder->quantity;
     }
+    // CONFIRMED 선점: 아직 출고되지 않아 재고에 잡혀 있음
+    for (const auto& o : orderRepo.filterByStatus(OrderStatus::CONFIRMED))
+        reserved += o.quantity;
+
     int availableStock = std::max(0, sample.stock - reserved);
 
     if (availableStock >= order.quantity) {
-        sampleRepo.deductStock(order.sampleId, order.quantity);
+        // 재고 차감은 출고 시점(CONFIRMED → RELEASED)에 수행
         orderRepo.updateStatus(orderNumber, OrderStatus::CONFIRMED);
         return { OrderStatus::CONFIRMED, 0, 0 };
     }
@@ -95,6 +99,8 @@ void OrderController::runApproval() {
         if (pending.has_value())
             reserved += pending->quantity;
     }
+    for (const auto& o : orderRepo_.filterByStatus(OrderStatus::CONFIRMED))
+        reserved += o.quantity;
     int availableStock = std::max(0, sample.stock - reserved);
     int decision = view_.promptApprovalDecision(order, sample, availableStock);
     switch (decision) {
