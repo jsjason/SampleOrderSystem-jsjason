@@ -145,9 +145,12 @@
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Model\Sample.cpp" />
+    <ClCompile Include="Model\Order.cpp" />
     <ClCompile Include="View\MainView.cpp" />
     <ClCompile Include="View\SampleView.cpp" />
+    <ClCompile Include="View\OrderView.cpp" />
     <ClCompile Include="Controller\SampleController.cpp" />
+    <ClCompile Include="Controller\OrderController.cpp" />
     <ClCompile Include="Controller\AppController.cpp" />
     <ClCompile Include="Tests\SampleRepositoryTest.cpp" />
     <ClCompile Include="Tests\OrderRepositoryTest.cpp" />
@@ -157,10 +160,13 @@
   <ItemGroup>
     <ClInclude Include="json.h" />
     <ClInclude Include="Model\Sample.h" />
+    <ClInclude Include="Model\Order.h" />
     <ClInclude Include="View\ConsoleColor.h" />
     <ClInclude Include="View\MainView.h" />
     <ClInclude Include="View\SampleView.h" />
+    <ClInclude Include="View\OrderView.h" />
     <ClInclude Include="Controller\SampleController.h" />
+    <ClInclude Include="Controller\OrderController.h" />
     <ClInclude Include="Controller\AppController.h" />
   </ItemGroup>
   <ItemGroup>

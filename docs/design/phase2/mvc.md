@@ -70,7 +70,10 @@ public:
         std::string customerName;
         int         quantity;
     };
-    OrderInput promptOrderInput() const;
+    // 시료 ID만 먼저 수집 (clearScreen + 폼 헤더 포함).
+    std::string promptSampleId() const;
+    // 시료 ID 검증 통과 후 나머지 항목 수집 (화면 유지, clearScreen 없음).
+    OrderInput  promptOrderInput(const std::string& sampleId) const;
 
     void showOrderSuccess(const Order& o) const;
     void showOrderFail(const std::string& reason) const;
@@ -101,15 +104,26 @@ public:
 선택 > _
 ```
 
-**주문 접수 입력**
+**주문 접수 입력 — 1단계: 시료 ID (`promptSampleId()`)**
 
-> 진입 시 `clearScreen()` 호출.
+> 진입 시 `clearScreen()` 호출. 시료 ID만 수집 후 즉시 컨트롤러에서 검증.
 
 ```
 -------------------------------------------
   주문 접수
 -------------------------------------------
 시료 ID        : _
+```
+
+**주문 접수 입력 — 2단계: 나머지 항목 (`promptOrderInput(sampleId)`)**
+
+> 1단계 화면 유지 (clearScreen 없음). 시료 ID 검증 통과 후에만 진입.
+
+```
+-------------------------------------------
+  주문 접수
+-------------------------------------------
+시료 ID        : S-001
 고객명          : _
 주문 수량 (ea) : _
 ```
@@ -131,7 +145,7 @@ public:
 
 **주문 접수 실패**
 
-> 입력 화면 아래에 오류 출력 후 `pauseForInput()`.
+> 입력 화면 아래에 오류 출력 후 `pauseForInput()`. 시료 ID 오류 시 고객명·수량은 묻지 않음.
 
 ```
   오류: 등록되지 않은 시료 ID입니다: S-999
@@ -202,9 +216,13 @@ run()
       _ → view_.showInvalidInput()
 
 handlePlaceOrder():
-  input = view_.promptOrderInput()
-  if !sampleRepo_.findById(input.sampleId).has_value():
-      view_.showOrderFail("등록되지 않은 시료 ID입니다: " + input.sampleId)
+  sampleId = view_.promptSampleId()
+  if !sampleRepo_.findById(sampleId).has_value():
+      view_.showOrderFail("등록되지 않은 시료 ID입니다: " + sampleId)
+      return                          ← 고객명·수량은 묻지 않음
+  input = view_.promptOrderInput(sampleId)
+  if input.quantity <= 0:
+      view_.showOrderFail("수량은 1 이상의 정수여야 합니다.")
       return
   order = orderRepo_.add(input.sampleId, input.customerName, input.quantity)
   view_.showOrderSuccess(order)
@@ -288,7 +306,8 @@ app.run();
 | 호출 지점 | 동작 |
 |----------|------|
 | `OrderView::showMenu()` 진입 시 | `clearScreen()` |
-| `OrderView::promptOrderInput()` 진입 시 | `clearScreen()` |
+| `OrderView::promptSampleId()` 진입 시 | `clearScreen()` |
+| `OrderView::promptOrderInput(sampleId)` 진입 시 | clearScreen 없음 — 1단계 화면 유지 |
 | `OrderView::showOrderSuccess/Fail()` 출력 후 | `pauseForInput()` |
 | `OrderView::showList()` 출력 후 | `pauseForInput()` |
 | `OrderView::showEmpty()` 출력 후 | `pauseForInput()` |
@@ -298,9 +317,10 @@ app.run();
 
 ## Phase 2 완료 기준 체크리스트
 
-- [ ] Debug 빌드: `OrderRepository` 6개 테스트 모두 PASS (누적 16 / 43)
-- [ ] Release 빌드: 메인 메뉴 [2] 시료 주문 진입 가능 확인
-- [ ] Release 빌드: 존재하는 시료 ID로 주문 접수 → 주문번호 `ORD-YYYYMMDD-NNNN` 형식 확인
-- [ ] Release 빌드: 존재하지 않는 시료 ID로 주문 시도 → 오류 메시지 확인
-- [ ] Release 빌드: 주문 목록에서 접수한 주문 표시 확인
-- [ ] Release 빌드: 프로그램 재시작 후 주문 데이터 유지 확인 (`data/orders.json`)
+- [x] Debug 빌드: `OrderRepository` 6개 테스트 모두 PASS (누적 16 / 43)
+- [x] Release 빌드: 메인 메뉴 [2] 시료 주문 진입 가능 확인
+- [x] Release 빌드: 존재하는 시료 ID로 주문 접수 → 주문번호 `ORD-YYYYMMDD-NNNN` 형식 확인
+- [x] Release 빌드: 존재하지 않는 시료 ID 입력 시 고객명·수량을 묻지 않고 즉시 오류 출력 확인
+- [x] Release 빌드: 수량에 0, 음수, 문자열 입력 시 오류 출력 확인 (1 이상 정수만 허용)
+- [x] Release 빌드: 주문 목록에서 접수한 주문 표시 확인
+- [x] Release 빌드: 프로그램 재시작 후 주문 데이터 유지 확인 (`data/orders.json`)

@@ -6,9 +6,12 @@
 
 #ifndef _DEBUG
 #include "Model/Sample.h"
+#include "Model/Order.h"
 #include "View/MainView.h"
 #include "View/SampleView.h"
+#include "View/OrderView.h"
 #include "Controller/SampleController.h"
+#include "Controller/OrderController.h"
 #include "Controller/AppController.h"
 #endif
 
@@ -27,12 +30,16 @@ int main(int argc, char* argv[]) {
     return RUN_ALL_TESTS();
 #else
     SampleRepository  sampleRepo("data/samples.json");
+    OrderRepository   orderRepo("data/orders.json");
 
     SampleView        sampleView;
     SampleController  sampleCtrl(sampleRepo, sampleView);
 
+    OrderView         orderView;
+    OrderController   orderCtrl(sampleRepo, orderRepo, orderView);
+
     MainView          mainView;
-    AppController     app(sampleRepo, sampleCtrl, mainView);
+    AppController     app(sampleRepo, sampleCtrl, orderCtrl, mainView);
 
     app.run();
     return 0;
