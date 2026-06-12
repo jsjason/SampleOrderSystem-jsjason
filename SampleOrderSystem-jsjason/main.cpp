@@ -7,6 +7,7 @@
 #ifndef _DEBUG
 #include "Model/Sample.h"
 #include "Model/Order.h"
+#include "Model/ProductionQueue.h"
 #include "View/MainView.h"
 #include "View/SampleView.h"
 #include "View/OrderView.h"
@@ -31,12 +32,13 @@ int main(int argc, char* argv[]) {
 #else
     SampleRepository  sampleRepo("data/samples.json");
     OrderRepository   orderRepo("data/orders.json");
+    ProductionQueue   prodQueue("data/production.json");
 
     SampleView        sampleView;
     SampleController  sampleCtrl(sampleRepo, sampleView);
 
     OrderView         orderView;
-    OrderController   orderCtrl(sampleRepo, orderRepo, orderView);
+    OrderController   orderCtrl(sampleRepo, orderRepo, prodQueue, orderView);
 
     MainView          mainView;
     AppController     app(sampleRepo, sampleCtrl, orderCtrl, mainView);

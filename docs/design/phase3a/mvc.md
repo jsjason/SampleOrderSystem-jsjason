@@ -118,7 +118,7 @@ return orderRepo.updateStatus(orderNumber, REJECTED)
 #include <string>
 #include <vector>
 #include "../Model/Order.h"
-#include "../Controller/OrderController.h"  // ApprovalResult
+#include "../Model/Sample.h"   // promptApprovalDecision에서 Sample 사용
 
 class OrderView {
 public:
@@ -137,12 +137,13 @@ public:
     void showInvalidInput() const;
 
     // --- Phase 3a 신규 ---
-    // 승인 대기(RESERVED) 주문 목록. 번호(1~N) 포함.
-    void showReservedList(const std::vector<Order>& orders) const;
+    // 승인 대기(RESERVED) 주문 목록. 번호(1~N) 포함. sampleNames[i]는 orders[i]의 시료명.
+    void showReservedList(const std::vector<Order>& orders,
+                          const std::vector<std::string>& sampleNames) const;
     // 처리할 주문 번호 선택 (1~N, 0=돌아가기).
     int  promptOrderSelection(int count) const;
-    // 승인(1) / 거절(2) / 취소(0) 선택. 선택 전 대상 주문 요약 출력.
-    int  promptApprovalDecision(const Order& order) const;
+    // 승인(1) / 거절(2) / 취소(0) 선택. 선택 전 대상 주문·시료 상세 출력.
+    int  promptApprovalDecision(const Order& order, const Sample& sample) const;
     // 승인 결과: 재고 충분 → CONFIRMED.
     void showApprovalConfirmed(const Order& order) const;
     // 승인 결과: 재고 부족 → PRODUCING. 부족분과 실 생산량 표시.
@@ -154,36 +155,49 @@ public:
 };
 ```
 
-> `OrderController.h`를 포함하므로, `OrderController.h`는 `OrderView.h`를 포함하면
-> 순환 참조가 발생한다. 이를 피하기 위해 `ApprovalResult` 구조체를 `Model/Order.h`
-> 하단에 정의하고, 양쪽이 `Order.h`만 포함하도록 한다.
+> 순환참조 방지: `OrderView.h`는 `Model/Sample.h`만 추가로 포함한다.
+> `ApprovalResult`는 `OrderController.h`에 정의하고, `OrderView`는 이를 포함하지 않는다.
+> `OrderView` 메서드는 `ApprovalResult` 대신 raw 파라미터(`int shortage`, `int actualQty`)를 받는다.
 
 ### 화면 레이아웃
 
 **승인 대기 주문 목록 (`showReservedList()`)**
 
 > 진입 시 `clearScreen()` 호출. 출력 후 `promptOrderSelection()` 호출.
+> 모든 정보를 한 줄에 표시. 시료명은 20 display col 고정폭(한글 2col/ASCII 1col),
+> 고객명은 16 display col 고정폭. `utf8DisplayWidth()` 헬퍼로 패딩 계산.
 
 ```
 -------------------------------------------
   주문 승인/거절  (2건)
 -------------------------------------------
-  [1] ORD-20260612-0001  S-001  100 ea
-      고객명: 삼성전자 파운드리  |  2026-06-12 15:30:00
-  [2] ORD-20260612-0002  S-002   50 ea
-      고객명: SK하이닉스         |  2026-06-12 15:45:00
+  번호주문번호            수량      시료명                고객명              접수일시
+  -------------------------------------------------------------------------------------------------
+  [1] ORD-20260612-0001      100 ea  실리콘 웨이퍼-8인치   삼성전자 파운드리   2026-06-12 15:30:00
+  [2] ORD-20260612-0002       50 ea  GaN 에피택셜-4인치    SK하이닉스          2026-06-12 15:45:00
 -------------------------------------------
 선택 (0=돌아가기) > _
 ```
 
 **승인/거절 결정 (`promptApprovalDecision()`)**
 
-> 이전 화면 유지 (clearScreen 없음). 선택 주문 요약 후 결정 프롬프트.
+> 이전 화면 유지 (clearScreen 없음). 주문·시료 상세 정보 출력 후 결정 프롬프트.
+> 재고가 부족한 경우 부족분을 ERR 색으로, 충분한 경우 "재고 충분"을 SUCCESS 색으로 표시.
 
 ```
 선택 (0=돌아가기) > 1
 
-  대상 주문: ORD-20260612-0001  S-001  100 ea  삼성전자 파운드리
+-------------------------------------------
+  주문 상세
+-------------------------------------------
+  주문번호      : ORD-20260612-0001
+  고객명        : 삼성전자 파운드리
+  주문 수량     : 500 ea
+-------------------------------------------
+  시료명        : 실리콘 웨이퍼-8인치  (S-001)
+  현재 재고     : 380 ea
+  부족분        : 120 ea          ← ERR 색 (재고 충분 시 "재고 충분" SUCCESS 색)
+  평균 생산시간 : 0.5 분/ea
 -------------------------------------------
   [1] 승인
   [2] 거절
@@ -297,14 +311,22 @@ runApproval()
   if orders.empty():
       view_.showNoReservedOrders()
       return
-  view_.showReservedList(orders)
+
+  // 시료명 목록 빌드 (sampleId → name, 조회 실패 시 sampleId 그대로 사용)
+  sampleNames = []
+  for o in orders:
+      s = sampleRepo_.findById(o.sampleId)
+      sampleNames.push_back(s.has_value() ? s->name : o.sampleId)
+
+  view_.showReservedList(orders, sampleNames)
   idx = view_.promptOrderSelection(orders.size())
   if idx == 0: return
   if idx < 1 || idx > (int)orders.size():
       view_.showInvalidInput(); return
 
   order    = orders[idx - 1]
-  decision = view_.promptApprovalDecision(order)
+  sample   = sampleRepo_.findById(order.sampleId).value()
+  decision = view_.promptApprovalDecision(order, sample)
   switch decision:
     1 → handleApprove(order)
     2 → handleReject(order)

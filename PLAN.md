@@ -180,7 +180,10 @@ JSON 파일 영속성이 동작해야 하며, 프로그램 재시작 후에도 �
 - 폴링이 늦어도 시간 계산 정확성 보장; 복수 작업이 동시에 완료될 수 있음
 
 **실 생산량 계산**: `ceil(부족분 / (수율 × 0.9))`
-**총 생산시간**: `평균생산시간 × 실생산량` (단위: 시간)
+**총 생산시간**: `avgProductionTime(분/ea) × actualQuantity × 60.0` → `totalDuration` (단위: 초)
+- `avgProductionTime`은 `Sample.h` 기준 분/ea
+- `totalDuration`을 초 단위로 변환하여 저장하면 `std::time_t` 차이값과 직접 비교 가능
+- 비교: `std::difftime(now, parsedStartedAt) >= totalDuration`
 
 ### 구현 대상
 
@@ -197,7 +200,7 @@ JSON 파일 영속성이 동작해야 하며, 프로그램 재시작 후에도 �
 `Tests/ProductionQueueTest.cpp` (4개)
 - `ProductionCalculation.부족분과_수율로_실_생산량을_계산한다`
 - `ProductionCalculation.수율_0_92_부족분_170일때_실생산량은_206이다`
-- `ProductionCalculation.총_생산시간은_평균생산시간_곱하기_실생산량이다`
+- `ProductionCalculation.총_생산시간은_평균생산시간_분_곱하기_실생산량_곱하기_60초이다`
 - `ProductionCalculation.부족분이_0이면_생산_작업을_등록하지_않는다`
 
 `Tests/ProductionQueueTest.cpp` — 자동 완료 (3개)

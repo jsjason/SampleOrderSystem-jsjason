@@ -78,21 +78,38 @@ TEST(OrderRepository, CONFIRMED_상태_주문만_필터링한다) {
 // -----------------------------------------------------------------------
 
 TEST(OrderRepository, RESERVED에서_CONFIRMED로_상태를_변경한다) {
-    GTEST_SKIP() << "TODO: Phase 3 구현 후 작성";
+    OrderRepository repo("");
+    auto o = placeOrder(repo);
+    EXPECT_TRUE(repo.updateStatus(o.orderNumber, OrderStatus::CONFIRMED));
+    EXPECT_EQ(repo.findByNumber(o.orderNumber)->status, OrderStatus::CONFIRMED);
 }
 
 TEST(OrderRepository, RESERVED에서_PRODUCING으로_상태를_변경한다) {
-    GTEST_SKIP() << "TODO: Phase 3 구현 후 작성";
+    OrderRepository repo("");
+    auto o = placeOrder(repo);
+    EXPECT_TRUE(repo.updateStatus(o.orderNumber, OrderStatus::PRODUCING));
+    EXPECT_EQ(repo.findByNumber(o.orderNumber)->status, OrderStatus::PRODUCING);
 }
 
 TEST(OrderRepository, RESERVED에서_REJECTED로_상태를_변경한다) {
-    GTEST_SKIP() << "TODO: Phase 3 구현 후 작성";
+    OrderRepository repo("");
+    auto o = placeOrder(repo);
+    EXPECT_TRUE(repo.updateStatus(o.orderNumber, OrderStatus::REJECTED));
+    EXPECT_EQ(repo.findByNumber(o.orderNumber)->status, OrderStatus::REJECTED);
 }
 
 TEST(OrderRepository, CONFIRMED에서_RELEASED로_상태를_변경한다) {
-    GTEST_SKIP() << "TODO: Phase 3 구현 후 작성";
+    OrderRepository repo("");
+    auto o = placeOrder(repo);
+    repo.updateStatus(o.orderNumber, OrderStatus::CONFIRMED);
+    EXPECT_TRUE(repo.updateStatus(o.orderNumber, OrderStatus::RELEASED));
+    EXPECT_EQ(repo.findByNumber(o.orderNumber)->status, OrderStatus::RELEASED);
 }
 
 TEST(OrderRepository, PRODUCING에서_CONFIRMED로_상태를_변경한다) {
-    GTEST_SKIP() << "TODO: Phase 3 구현 후 작성";
+    OrderRepository repo("");
+    auto o = placeOrder(repo);
+    repo.updateStatus(o.orderNumber, OrderStatus::PRODUCING);
+    EXPECT_TRUE(repo.updateStatus(o.orderNumber, OrderStatus::CONFIRMED));
+    EXPECT_EQ(repo.findByNumber(o.orderNumber)->status, OrderStatus::CONFIRMED);
 }

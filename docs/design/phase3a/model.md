@@ -65,7 +65,7 @@ struct ProductionJob {
     std::string enqueuedAt;     // 큐 등록 시각 ("YYYY-MM-DD HH:MM:SS")
     // Phase 3b에서 사용:
     std::string startedAt;      // 생산 시작 시각 (3a에서는 빈 문자열로 저장)
-    double      totalDuration;  // 총 생산시간 시간 단위 (3a에서는 0.0으로 저장)
+    double      totalDuration;  // 총 생산시간 초 단위 (3a에서는 0.0으로 저장)
 
     nlohmann::json toJson() const;
     static ProductionJob fromJson(const nlohmann::json& j);

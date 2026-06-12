@@ -146,6 +146,7 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Model\Sample.cpp" />
     <ClCompile Include="Model\Order.cpp" />
+    <ClCompile Include="Model\ProductionQueue.cpp" />
     <ClCompile Include="View\MainView.cpp" />
     <ClCompile Include="View\SampleView.cpp" />
     <ClCompile Include="View\OrderView.cpp" />
@@ -161,6 +162,7 @@
     <ClInclude Include="json.h" />
     <ClInclude Include="Model\Sample.h" />
     <ClInclude Include="Model\Order.h" />
+    <ClInclude Include="Model\ProductionQueue.h" />
     <ClInclude Include="View\ConsoleColor.h" />
     <ClInclude Include="View\MainView.h" />
     <ClInclude Include="View\SampleView.h" />

@@ -28,7 +28,7 @@ void MainView::showMenu(int sampleCount, int totalStock) const {
     std::cout << SEP << "===========================================" << RESET << "\n";
     std::cout << "  " << LABEL << "[1]" << RESET << " 시료 관리\n";
     std::cout << "  " << LABEL << "[2]" << RESET << " 시료 주문\n";
-    std::cout << "  " << LABEL << "[3]" << RESET << " 주문 승인/거절       " << SEP << "(준비 중)" << RESET << "\n";
+    std::cout << "  " << LABEL << "[3]" << RESET << " 주문 승인/거절\n";
     std::cout << "  " << LABEL << "[4]" << RESET << " 모니터링             " << SEP << "(준비 중)" << RESET << "\n";
     std::cout << "  " << LABEL << "[5]" << RESET << " 생산라인 조회        " << SEP << "(준비 중)" << RESET << "\n";
     std::cout << "  " << LABEL << "[6]" << RESET << " 출고 처리            " << SEP << "(준비 중)" << RESET << "\n";

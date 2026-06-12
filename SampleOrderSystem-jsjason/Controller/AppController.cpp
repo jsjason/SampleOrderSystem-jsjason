@@ -22,7 +22,8 @@ void AppController::run() {
         switch (choice) {
             case 1: sampleCtrl_.run(); break;
             case 2: orderCtrl_.run(); break;
-            case 3: case 4: case 5: case 6:
+            case 3: orderCtrl_.runApproval(); break;
+            case 4: case 5: case 6:
                 mainView_.showNotImplemented(); break;
             case 0: return;
             default: mainView_.showInvalidInput(); break;
