@@ -4,15 +4,37 @@
 #include <gtest/gtest.h>
 #endif
 
+#ifndef _DEBUG
+#include "Model/Sample.h"
+#include "View/MainView.h"
+#include "View/SampleView.h"
+#include "Controller/SampleController.h"
+#include "Controller/AppController.h"
+#endif
+
 int main(int argc, char* argv[]) {
     SetConsoleCP(CP_UTF8);
     SetConsoleOutputCP(CP_UTF8);
+
+    // ANSI 색상 코드 활성화 (Windows 10+)
+    HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+    DWORD  mode = 0;
+    GetConsoleMode(hOut, &mode);
+    SetConsoleMode(hOut, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
 
 #ifdef _DEBUG
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 #else
-    // TODO: AppController 조립 및 실행
+    SampleRepository  sampleRepo("data/samples.json");
+
+    SampleView        sampleView;
+    SampleController  sampleCtrl(sampleRepo, sampleView);
+
+    MainView          mainView;
+    AppController     app(sampleRepo, sampleCtrl, mainView);
+
+    app.run();
     return 0;
 #endif
 }
