@@ -169,10 +169,15 @@ JSON 파일 영속성이 동작해야 하며, 프로그램 재시작 후에도 �
 생산 큐의 작업은 순차(FIFO)로 진행되며, 앞 작업 완료 후 다음 작업이 시작된다.
 완료 시 재고 증가 및 주문 상태 전환(`PRODUCING → CONFIRMED`)이 자동으로 이루어진다.
 
-**자동 완료 체크 호출 지점**: 재고 수량을 확인해야 하는 모든 진입 시점
-- `AppController::run()` 루프 상단 (메인 메뉴 진입 시)
-- `OrderController::handleApproveOrder()` 진입 시
-- `ProductionController::run()` 루프 상단 (생산라인 조회 진입 시)
+**자동 완료 체크 호출 지점**: 재고 수량을 확인하는 모든 화면 진입 시 즉시 반영
+
+`AppController::run()` 루프 상단 호출로 메인 메뉴 복귀마다 체크되지만,
+서브 컨트롤러 루프 안에서도 재고를 표시하는 화면은 별도로 호출한다.
+
+- `AppController::run()` 루프 상단 — 모든 화면 이동 전 공통 적용
+- `OrderController::runApproval()` 진입 시 — 승인 화면에서 시료 재고를 직접 확인
+- `MonitorController::run()` 루프 상단 — 모니터링 화면에서 시료별 재고 현황 표시
+- `ProductionController::run()` 루프 상단 — 생산라인 조회 화면
 
 **순차 처리 시간 계산**:
 - 큐 앞 작업의 `startedAt + totalDuration <= now` → 완료 처리
@@ -185,15 +190,51 @@ JSON 파일 영속성이 동작해야 하며, 프로그램 재시작 후에도 �
 - `totalDuration`을 초 단위로 변환하여 저장하면 `std::time_t` 차이값과 직접 비교 가능
 - 비교: `std::difftime(now, parsedStartedAt) >= totalDuration`
 
+### 테스트 전략 — 시간 주입
+
+시간 기반 로직을 테스트하기 위해 두 가지 방법을 조합한다.
+
+**① 단위 테스트: `now` 파라미터 주입**
+
+`processCompleted()`는 `now`를 파라미터로 받되 기본값만 지정한다.
+Mock 프레임워크 없이 원하는 타임스탬프를 직접 전달한다.
+
+```cpp
+void processCompleted(SampleRepository& sampleRepo,
+                      OrderRepository&  orderRepo,
+                      std::time_t       now = std::time(nullptr));
+```
+
+테스트 코드:
+```cpp
+// startedAt을 파싱한 뒤, totalDuration 이후 시각을 직접 전달
+std::time_t future = parsedStartedAt + (std::time_t)job.totalDuration + 1;
+prodQueue.processCompleted(sampleRepo, orderRepo, future);
+```
+
+**② 수동 통합 테스트: 짧은 avgProductionTime 시료 등록**
+
+코드 변경 없이, 아주 작은 `avgProductionTime`의 시료를 등록한다.
+
+```
+avgProductionTime = 0.01 min/ea
+actualQuantity    = 10 ea
+totalDuration     = 0.01 × 10 × 60 = 6초
+```
+
+6초 대기 후 메인 메뉴 재진입 시 생산 완료가 자동 반영된다.
+
+---
+
 ### 구현 대상
 
 | 파일 | 내용 |
 |------|------|
-| `Model/ProductionQueue.h/.cpp` (수정) | `ProductionJob`에 `startedAt`, `totalDuration` 추가. `processCompleted(SampleRepository&, OrderRepository&)` 메서드 구현 |
+| `Model/ProductionQueue.h/.cpp` (수정) | `ProductionJob`에 `startedAt`, `totalDuration` 추가. `processCompleted(SampleRepository&, OrderRepository&, std::time_t now = std::time(nullptr))` 메서드 구현 |
 | `Controller/ProductionController.h/.cpp` | 생산라인 조회 (현재 작업 + 대기 큐 목록, 예상 완료 시각) |
 | `View/ProductionView.h/.cpp` | 생산 현황 테이블, 대기 큐 목록 출력 |
 | `Controller/AppController` (수정) | 루프 상단에 `processCompleted()` 호출, [5] 생산라인 조회 메뉴 연결 |
-| `Controller/OrderController` (수정) | `handleApproveOrder()` 진입 시 `processCompleted()` 호출 |
+| `Controller/OrderController` (수정) | `runApproval()` 진입 시 `processCompleted()` 호출 |
 
 ### 통과 단위 테스트 (10개)
 
@@ -215,11 +256,14 @@ JSON 파일 영속성이 동작해야 하며, 프로그램 재시작 후에도 �
 
 ### 수동 테스트 시나리오 (Release 빌드)
 
+> 빠른 테스트를 위해 `avgProductionTime = 0.01` (min/ea) 시료를 등록한다.
+> `actualQuantity = 10` 기준 `totalDuration = 6초`.
+
 ```
 [생산 자동 완료 경로]
-1. (Phase 3a 재고 부족 경로 이후) PRODUCING 상태 주문 존재
+1. avgProductionTime=0.01 시료 등록 후 재고 부족 주문 승인 → PRODUCING 전환 확인
 2. [5] 생산라인 조회 → 현재 작업, 대기 큐, 예상 완료 시각 확인
-3. 충분한 시간 경과 후 메인 메뉴 재진입 또는 [5] 재진입
+3. 6초 이상 경과 후 메인 메뉴 재진입
 4. 자동 완료 처리 → 재고 증가, 주문 상태 PRODUCING → CONFIRMED 전환 확인
 
 [복수 작업 순차 완료]
