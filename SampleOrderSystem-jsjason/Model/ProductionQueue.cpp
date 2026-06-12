@@ -155,6 +155,11 @@ void ProductionQueue::processCompleted(SampleRepository& sampleRepo,
     }
 }
 
+void ProductionQueue::clear() {
+    jobs_.clear();
+    save();
+}
+
 void ProductionQueue::load() {
     if (filePath_.empty()) return;
     std::ifstream f(filePath_);

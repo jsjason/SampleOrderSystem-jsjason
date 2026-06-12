@@ -8,6 +8,7 @@ AppController::AppController(SampleRepository&     sampleRepo,
                              ProductionController& productionCtrl,
                              ReleaseController&    releaseCtrl,
                              MonitorController&    monitorCtrl,
+                             DummyController&      dummyCtrl,
                              MainView&             mainView)
     : sampleRepo_(sampleRepo)
     , orderRepo_(orderRepo)
@@ -17,6 +18,7 @@ AppController::AppController(SampleRepository&     sampleRepo,
     , productionCtrl_(productionCtrl)
     , releaseCtrl_(releaseCtrl)
     , monitorCtrl_(monitorCtrl)
+    , dummyCtrl_(dummyCtrl)
     , mainView_(mainView) {}
 
 void AppController::run() {
@@ -40,6 +42,7 @@ void AppController::run() {
             case 4: monitorCtrl_.run();       break;
             case 5: productionCtrl_.run();    break;
             case 6: releaseCtrl_.run();       break;
+            case 7: dummyCtrl_.run();        break;
             case 0: return;
             default: mainView_.showInvalidInput(); break;
         }

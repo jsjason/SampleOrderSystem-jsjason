@@ -32,6 +32,7 @@ public:
     std::optional<Order>       findByNumber(const std::string& orderNumber) const;
     std::vector<Order>         filterByStatus(OrderStatus status) const;
     bool                       updateStatus(const std::string& orderNumber, OrderStatus newStatus);
+    void                       replaceAll(const std::vector<Order>& orders);
 
 private:
     std::string        filePath_;

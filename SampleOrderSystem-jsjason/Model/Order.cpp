@@ -153,6 +153,11 @@ bool OrderRepository::updateStatus(const std::string& orderNumber, OrderStatus n
     return false;
 }
 
+void OrderRepository::replaceAll(const std::vector<Order>& orders) {
+    orders_ = orders;
+    save();
+}
+
 void OrderRepository::load() {
     if (filePath_.empty()) return;
     std::ifstream file(filePath_);

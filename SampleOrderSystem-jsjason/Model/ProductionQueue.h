@@ -46,6 +46,7 @@ public:
     std::vector<ProductionJob> getAll() const;
 
     bool empty() const;
+    void clear();
 
     // 경과 시간 기준으로 완료된 작업을 FIFO 순서대로 처리.
     // now 기본값은 실제 시스템 시간. 테스트에서는 타임스탬프를 직접 주입.

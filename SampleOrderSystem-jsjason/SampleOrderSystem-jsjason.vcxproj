@@ -153,11 +153,13 @@
     <ClCompile Include="View\ProductionView.cpp" />
     <ClCompile Include="View\ReleaseView.cpp" />
     <ClCompile Include="View\MonitorView.cpp" />
+    <ClCompile Include="View\DummyView.cpp" />
     <ClCompile Include="Controller\SampleController.cpp" />
     <ClCompile Include="Controller\OrderController.cpp" />
     <ClCompile Include="Controller\ProductionController.cpp" />
     <ClCompile Include="Controller\ReleaseController.cpp" />
     <ClCompile Include="Controller\MonitorController.cpp" />
+    <ClCompile Include="Controller\DummyController.cpp" />
     <ClCompile Include="Controller\AppController.cpp" />
     <ClCompile Include="Tests\SampleRepositoryTest.cpp" />
     <ClCompile Include="Tests\OrderRepositoryTest.cpp" />
@@ -176,11 +178,13 @@
     <ClInclude Include="View\ProductionView.h" />
     <ClInclude Include="View\ReleaseView.h" />
     <ClInclude Include="View\MonitorView.h" />
+    <ClInclude Include="View\DummyView.h" />
     <ClInclude Include="Controller\SampleController.h" />
     <ClInclude Include="Controller\OrderController.h" />
     <ClInclude Include="Controller\ProductionController.h" />
     <ClInclude Include="Controller\ReleaseController.h" />
     <ClInclude Include="Controller\MonitorController.h" />
+    <ClInclude Include="Controller\DummyController.h" />
     <ClInclude Include="Controller\AppController.h" />
   </ItemGroup>
   <ItemGroup>

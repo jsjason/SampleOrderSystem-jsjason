@@ -35,6 +35,7 @@ void MainView::showMenu(int sampleCount, int totalStock,
     std::cout << "  " << LABEL << "[4]" << RESET << " 모니터링\n";
     std::cout << "  " << LABEL << "[5]" << RESET << " 생산라인 조회\n";
     std::cout << "  " << LABEL << "[6]" << RESET << " 출고 처리\n";
+    std::cout << "  " << LABEL << "[7]" << RESET << " 더미 데이터 생성\n";
     std::cout << "  " << LABEL << "[0]" << RESET << " 종료\n";
     std::cout << SEP << "===========================================" << RESET << "\n";
 }

@@ -8,6 +8,7 @@
 #include "ProductionController.h"
 #include "ReleaseController.h"
 #include "MonitorController.h"
+#include "DummyController.h"
 
 class AppController {
 public:
@@ -19,6 +20,7 @@ public:
                   ProductionController& productionCtrl,
                   ReleaseController&    releaseCtrl,
                   MonitorController&    monitorCtrl,
+                  DummyController&      dummyCtrl,
                   MainView&             mainView);
     void run();
 
@@ -31,5 +33,6 @@ private:
     ProductionController& productionCtrl_;
     ReleaseController&    releaseCtrl_;
     MonitorController&    monitorCtrl_;
+    DummyController&      dummyCtrl_;
     MainView&             mainView_;
 };

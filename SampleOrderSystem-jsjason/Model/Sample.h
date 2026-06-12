@@ -26,6 +26,7 @@ public:
     std::vector<Sample>         searchByName(const std::string& keyword) const;
     bool                        deductStock(const std::string& id, int quantity);
     void                        addStock(const std::string& id, int quantity);
+    void                        replaceAll(const std::vector<Sample>& samples);
 
 private:
     std::string         filePath_;

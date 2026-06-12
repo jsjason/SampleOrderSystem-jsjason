@@ -90,6 +90,11 @@ void SampleRepository::addStock(const std::string& id, int quantity) {
     }
 }
 
+void SampleRepository::replaceAll(const std::vector<Sample>& samples) {
+    samples_ = samples;
+    save();
+}
+
 void SampleRepository::load() {
     if (filePath_.empty()) return;
     std::ifstream file(filePath_);

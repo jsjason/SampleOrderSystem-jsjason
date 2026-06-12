@@ -15,13 +15,14 @@ ApprovalResult applyApproval(const std::string& orderNumber,
     // PRODUCING 선점: 생산 완료 시 이 수량이 출고되므로 선점으로 간주
     int reserved = 0;
     for (const auto& job : prodQueue.getAll()) {
+        if (job.sampleId != sample.id) continue;
         auto pendingOrder = orderRepo.findByNumber(job.orderNumber);
         if (pendingOrder.has_value())
             reserved += pendingOrder->quantity;
     }
     // CONFIRMED 선점: 아직 출고되지 않아 재고에 잡혀 있음
     for (const auto& o : orderRepo.filterByStatus(OrderStatus::CONFIRMED))
-        reserved += o.quantity;
+        if (o.sampleId == sample.id) reserved += o.quantity;
 
     int availableStock = std::max(0, sample.stock - reserved);
 
@@ -95,12 +96,13 @@ void OrderController::runApproval() {
 
     int reserved = 0;
     for (const auto& job : prodQueue_.getAll()) {
+        if (job.sampleId != sample.id) continue;
         auto pending = orderRepo_.findByNumber(job.orderNumber);
         if (pending.has_value())
             reserved += pending->quantity;
     }
     for (const auto& o : orderRepo_.filterByStatus(OrderStatus::CONFIRMED))
-        reserved += o.quantity;
+        if (o.sampleId == sample.id) reserved += o.quantity;
     int availableStock = std::max(0, sample.stock - reserved);
     int decision = view_.promptApprovalDecision(order, sample, availableStock);
     switch (decision) {
