@@ -97,26 +97,24 @@ JSON 파일 영속성이 동작해야 하며, 프로그램 재시작 후에도 �
 
 ---
 
-## Phase 3 — 주문 승인/거절 + 생산 큐
+## Phase 3a — 주문 승인/거절 + 생산 큐 등록
 
 ### 목표
 `RESERVED` 주문을 승인하거나 거절한다. 승인 시 재고를 확인하여:
 - 재고 충분 → `CONFIRMED` (즉시 출고 대기)
 - 재고 부족 → 생산 큐에 자동 등록, `PRODUCING`
 
-생산라인 조회 메뉴에서 현재 생산 중인 작업과 대기 큐를 확인할 수 있다.
+생산 완료 자동 처리(시간 기반)는 Phase 3b에서 구현한다.
 
 ### 구현 대상
 
 | 파일 | 내용 |
 |------|------|
-| `Model/ProductionQueue.h/.cpp` | `ProductionJob` 구조체, `ProductionQueue` (FIFO enqueue/dequeue/peek/list), 실 생산량 계산 `ceil(shortage / (yield × 0.9))` |
+| `Model/ProductionQueue.h/.cpp` | `ProductionJob` 구조체, `ProductionQueue` (FIFO enqueue/dequeue/peek/list). 시간 필드(`startedAt`, `totalDuration`)는 선언만, 자동 완료 로직은 Phase 3b에서 추가 |
 | `Controller/OrderController` (수정) | 승인 로직: 재고 판단 → `SampleRepository.deductStock()` or 생산 큐 등록, 거절 로직 |
-| `Controller/ProductionController.h/.cpp` | 생산라인 조회 (현재 작업 + 대기 큐 목록), 생산 완료 처리 |
-| `View/ProductionView.h/.cpp` | 생산 현황 테이블, 대기 큐 목록 출력 |
-| `Controller/AppController` (수정) | [3] 주문 승인/거절, [5] 생산라인 조회 메뉴 연결 |
+| `Controller/AppController` (수정) | [3] 주문 승인/거절 메뉴 연결 |
 
-### 통과 단위 테스트 (23개)
+### 통과 단위 테스트 (19개)
 
 `Tests/OrderRepositoryTest.cpp` (5개)
 - `OrderRepository.RESERVED에서_CONFIRMED로_상태를_변경한다`
@@ -125,11 +123,7 @@ JSON 파일 영속성이 동작해야 하며, 프로그램 재시작 후에도 �
 - `OrderRepository.CONFIRMED에서_RELEASED로_상태를_변경한다`
 - `OrderRepository.PRODUCING에서_CONFIRMED로_상태를_변경한다`
 
-`Tests/ProductionQueueTest.cpp` (9개)
-- `ProductionCalculation.부족분과_수율로_실_생산량을_계산한다`
-- `ProductionCalculation.수율_0_92_부족분_170일때_실생산량은_206이다`
-- `ProductionCalculation.총_생산시간은_평균생산시간_곱하기_실생산량이다`
-- `ProductionCalculation.부족분이_0이면_생산_작업을_등록하지_않는다`
+`Tests/ProductionQueueTest.cpp` (5개)
 - `ProductionQueue.작업을_등록하면_큐_뒤에_추가된다`
 - `ProductionQueue.먼저_등록된_작업이_먼저_처리된다_FIFO`
 - `ProductionQueue.빈_큐에서_처리할_작업이_없으면_nullopt를_반환한다`
@@ -160,12 +154,74 @@ JSON 파일 영속성이 동작해야 하며, 프로그램 재시작 후에도 �
 1. S-001 시료 (재고 380ea) 에 대해 수량 500 주문 접수
 2. [3] 주문 승인 → 부족분 120ea 생산 큐 등록 확인
 3. 주문 상태 RESERVED → PRODUCING 전환 확인
-4. [5] 생산라인 조회 → 큐에 해당 작업 표시 확인
-5. [5] 생산 완료 처리 → 주문 상태 PRODUCING → CONFIRMED 전환 확인
 
 [거절 경로]
 1. 임의 주문 접수 후 [3]에서 거절 선택
 2. 상태 REJECTED 전환 확인, 재고 변동 없음 확인
+```
+
+---
+
+## Phase 3b — 시간 기반 자동 생산 완료 + 생산라인 조회
+
+### 목표
+실제 컴퓨터 시간을 기준으로 생산 작업을 자동 완료 처리한다.
+생산 큐의 작업은 순차(FIFO)로 진행되며, 앞 작업 완료 후 다음 작업이 시작된다.
+완료 시 재고 증가 및 주문 상태 전환(`PRODUCING → CONFIRMED`)이 자동으로 이루어진다.
+
+**자동 완료 체크 호출 지점**: 재고 수량을 확인해야 하는 모든 진입 시점
+- `AppController::run()` 루프 상단 (메인 메뉴 진입 시)
+- `OrderController::handleApproveOrder()` 진입 시
+- `ProductionController::run()` 루프 상단 (생산라인 조회 진입 시)
+
+**순차 처리 시간 계산**:
+- 큐 앞 작업의 `startedAt + totalDuration <= now` → 완료 처리
+- 다음 작업의 `startedAt` = 이전 작업의 `startedAt + totalDuration` (now 기준 아님)
+- 폴링이 늦어도 시간 계산 정확성 보장; 복수 작업이 동시에 완료될 수 있음
+
+**실 생산량 계산**: `ceil(부족분 / (수율 × 0.9))`
+**총 생산시간**: `평균생산시간 × 실생산량` (단위: 시간)
+
+### 구현 대상
+
+| 파일 | 내용 |
+|------|------|
+| `Model/ProductionQueue.h/.cpp` (수정) | `ProductionJob`에 `startedAt`, `totalDuration` 추가. `processCompleted(SampleRepository&, OrderRepository&)` 메서드 구현 |
+| `Controller/ProductionController.h/.cpp` | 생산라인 조회 (현재 작업 + 대기 큐 목록, 예상 완료 시각) |
+| `View/ProductionView.h/.cpp` | 생산 현황 테이블, 대기 큐 목록 출력 |
+| `Controller/AppController` (수정) | 루프 상단에 `processCompleted()` 호출, [5] 생산라인 조회 메뉴 연결 |
+| `Controller/OrderController` (수정) | `handleApproveOrder()` 진입 시 `processCompleted()` 호출 |
+
+### 통과 단위 테스트 (10개)
+
+`Tests/ProductionQueueTest.cpp` (4개)
+- `ProductionCalculation.부족분과_수율로_실_생산량을_계산한다`
+- `ProductionCalculation.수율_0_92_부족분_170일때_실생산량은_206이다`
+- `ProductionCalculation.총_생산시간은_평균생산시간_곱하기_실생산량이다`
+- `ProductionCalculation.부족분이_0이면_생산_작업을_등록하지_않는다`
+
+`Tests/ProductionQueueTest.cpp` — 자동 완료 (3개)
+- `ProductionQueue.경과_시간이_충분하면_완료_작업이_자동_처리된다`
+- `ProductionQueue.순차_처리시_다음_작업의_startedAt은_이전_작업_완료시각이다`
+- `ProductionQueue.경과_시간이_부족하면_작업이_처리되지_않는다`
+
+`Tests/OrderApprovalTest.cpp` (3개)
+- `OrderApproval.생산_완료시_PRODUCING에서_CONFIRMED로_전환된다`
+- `OrderApproval.생산_완료시_시료_재고가_실생산량만큼_증가한다`
+- `OrderApproval.생산_완료시_재고에서_주문량만큼_차감된다`
+
+### 수동 테스트 시나리오 (Release 빌드)
+
+```
+[생산 자동 완료 경로]
+1. (Phase 3a 재고 부족 경로 이후) PRODUCING 상태 주문 존재
+2. [5] 생산라인 조회 → 현재 작업, 대기 큐, 예상 완료 시각 확인
+3. 충분한 시간 경과 후 메인 메뉴 재진입 또는 [5] 재진입
+4. 자동 완료 처리 → 재고 증가, 주문 상태 PRODUCING → CONFIRMED 전환 확인
+
+[복수 작업 순차 완료]
+1. PRODUCING 작업이 있는 상태에서 추가 주문 승인 → 큐에 두 번째 작업 등록 확인
+2. 충분한 시간 경과 후 첫 번째 작업 완료 → 두 번째 작업 자동 시작 확인
 ```
 
 ---
@@ -188,13 +244,10 @@ JSON 파일 영속성이 동작해야 하며, 프로그램 재시작 후에도 �
 | `View/MainView` (수정) | 현황 요약 출력 (등록 시료 수, 총 재고, 전체 주문 수, 생산 대기) |
 | `Controller/AppController` (수정) | [4] 모니터링, [6] 출고 처리 메뉴 연결, 현황 데이터 전달 |
 
-### 통과 단위 테스트 (4개)
+### 통과 단위 테스트 (1개)
 
 `Tests/OrderApprovalTest.cpp`
 
-- `OrderApproval.생산_완료시_PRODUCING에서_CONFIRMED로_전환된다`
-- `OrderApproval.생산_완료시_시료_재고가_실생산량만큼_증가한다`
-- `OrderApproval.생산_완료시_재고에서_주문량만큼_차감된다`
 - `OrderApproval.CONFIRMED_주문을_출고하면_RELEASED로_전환된다`
 
 ### 수동 테스트 시나리오 (Release 빌드)
@@ -220,9 +273,10 @@ JSON 파일 영속성이 동작해야 하며, 프로그램 재시작 후에도 �
 
 | Phase | 새로 통과하는 테스트 | 누적 통과 |
 |-------|-------------------|---------|
-| Phase 1 | SampleRepository 10개 | **10 / 43** |
-| Phase 2 | OrderRepository 6개 | **16 / 43** |
-| Phase 3 | OrderRepository 5개 + ProductionQueue 9개 + OrderApproval 9개 | **39 / 43** |
-| Phase 4 | OrderApproval 4개 | **43 / 43** |
+| Phase 1  | SampleRepository 10개 | **10 / 46** |
+| Phase 2  | OrderRepository 6개 | **16 / 46** |
+| Phase 3a | OrderRepository 5개 + ProductionQueue 5개 + OrderApproval 9개 | **35 / 46** |
+| Phase 3b | ProductionCalculation 4개 + ProductionQueue(자동완료) 3개 + OrderApproval(생산완료) 3개 | **45 / 46** |
+| Phase 4  | OrderApproval 1개 | **46 / 46** |
 
-Phase 4 완료 시 전체 43개 테스트 PASS, 0개 SKIPPED.
+Phase 4 완료 시 전체 46개 테스트 PASS, 0개 SKIPPED.
