@@ -30,28 +30,26 @@ SampleOrderSystem-jsjason/
 | 상태 | 조건 |
 |------|------|
 | **고갈** | `sample.stock == 0` |
-| **부족** | `stock > 0` AND `stock < 미출고 전체 수요` |
+| **부족** | `stock > 0` AND RESERVED 주문 대기 수량 > 가용 재고 |
 | **여유** | 그 외 |
 
-### 미출고 전체 수요 계산 (`totalDemand`)
+### 가용 재고 계산 (`availableStock`)
 
-출고되지 않은 모든 활성 주문(RESERVED, PRODUCING, CONFIRMED)의 수량을 합산한다.
+Phase 4a에서 확립한 reserved 계산과 동일한 방식을 사용한다.
+CONFIRMED 주문은 아직 출고되지 않아 재고에 잡혀 있으므로 선점으로 간주한다.
 
 ```
-totalDemand = Σ RESERVED  주문 수량(해당 시료)
-            + Σ PRODUCING 주문 수량(해당 시료)
-            + Σ CONFIRMED 주문 수량(해당 시료)
+reservedQty     = Σ PRODUCING 주문 수량(해당 시료)
+                + Σ CONFIRMED 주문 수량(해당 시료)
+availableStock  = max(0, sample.stock - reservedQty)
+pendingReserved = Σ RESERVED  주문 수량(해당 시료)
 
 고갈: sample.stock == 0
-부족: stock > 0 AND stock < totalDemand
+부족: stock > 0 AND pendingReserved > availableStock
 여유: 그 외
 ```
 
-- **RESERVED**: 승인 대기 중인 잠재 수요
-- **PRODUCING**: 생산 진행 중 — 재고가 아직 확보되지 않은 수요
-- **CONFIRMED**: 승인 완료, 미출고 — 현재 재고에서 출고 예정인 선점 수요
-
-`totalDemand`가 0이면 활성 주문이 없어 항상 **여유**로 분류된다.
+`pendingReserved`가 0이면 RESERVED 주문이 없어 항상 **여유**로 분류된다.
 
 ### 데이터 구조
 
@@ -116,16 +114,23 @@ run():
     // 시료별 재고 상태 판단
     stockStatuses = []
     for sample in samples:
-        // 미출고 전체 수요: RESERVED + PRODUCING + CONFIRMED
-        totalDemand = 0
-        for o in orderRepo_.getAll():
-            if o.sampleId == sample.id and
-               o.status in (RESERVED, PRODUCING, CONFIRMED):
-                totalDemand += o.quantity
+        reservedQty = 0
+        for job in prodQueue_.getAll():
+            if job.sampleId == sample.id:
+                o = orderRepo_.findByNumber(job.orderNumber)
+                if o.has_value(): reservedQty += o->quantity
+        for o in orderRepo_.filterByStatus(CONFIRMED):
+            if o.sampleId == sample.id: reservedQty += o.quantity
+
+        availableStock = max(0, sample.stock - reservedQty)
+
+        pendingReserved = 0
+        for o in orderRepo_.filterByStatus(RESERVED):
+            if o.sampleId == sample.id: pendingReserved += o.quantity
 
         if sample.stock == 0:
             level = EMPTY
-        elif sample.stock < totalDemand:
+        elif pendingReserved > availableStock:
             level = SHORT
         else:
             level = AMPLE
@@ -377,6 +382,6 @@ AppController        app(sampleRepo, orderRepo, prodQueue,
 - [ ] REJECTED 주문은 집계에서 제외됨
 - [ ] 시료별 재고 상태(여유/부족/고갈) 표기 확인
 - [ ] 재고 0인 시료 → `[고갈]` (회색) 표시
-- [ ] 미출고 전체 수요(RESERVED+PRODUCING+CONFIRMED) > 현재 재고인 시료 → `[부족]` (빨강) 표시
+- [ ] RESERVED 주문 합계 > 가용 재고인 시료 → `[부족]` (빨강) 표시
 - [ ] 그 외 → `[여유]` (초록) 표시
 - [ ] Enter 후 메인 메뉴로 복귀 확인
