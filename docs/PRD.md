@@ -150,12 +150,11 @@ RESERVED   ← 주문 접수 (초기 상태)
 ```
 승인 요청 (RESERVED 주문)
     ↓
-가용 재고 계산: availableStock = max(0, stock - reserved)
-    (* reserved = PRODUCING 상태 주문들의 수량 합산 — 이미 생산에 선점된 재고)
+가용 재고 계산: availableStock = max(0, stock - reservedQty)
+    (* reservedQty = PRODUCING + CONFIRMED 주문 수량 합산 — 선점된 재고)
     ↓
 가용 재고 확인: availableStock >= quantity ?
-    ├── YES → stock -= quantity
-    │         상태 = CONFIRMED
+    ├── YES → 상태 = CONFIRMED  (재고 차감은 출고 시점에 수행)
     └── NO  → 부족분 = quantity - availableStock
               실 생산량 = ceil(부족분 / (수율 × 0.9))
               총 생산 시간 = 평균 생산시간 × 실 생산량 × 60.0 (초)
@@ -186,9 +185,11 @@ RESERVED   ← 주문 접수 (초기 상태)
 
 | 상태 | 조건 |
 |------|------|
-| **여유** | 재고 > 0 이고 주문 대비 충분 |
-| **부족** | 재고 > 0 이지만 주문 대비 부족 |
-| **고갈** | 재고 = 0 |
+| **여유** | `stock > 0` 이고 `stock >= 미출고 전체 수요` |
+| **부족** | `stock > 0` 이지만 `stock < 미출고 전체 수요` |
+| **고갈** | `stock == 0` |
+
+미출고 전체 수요 = RESERVED + PRODUCING + CONFIRMED 주문 수량 합계 (해당 시료)
 
 ---
 
@@ -223,8 +224,8 @@ RESERVED   ← 주문 접수 (초기 상태)
 (`producedSoFar = floor(경과시간 / 개당생산시간)`, 이미 반영된 수량은 `creditedQuantity`로 추적하여 중복 방지)
 
 완료 처리 내용 (전체 실 생산량 생산 완료 시):
-1. `stock -= 주문 수량` (재고에서 주문분 차감)
-2. 주문 상태: `PRODUCING → CONFIRMED`
+1. 주문 상태: `PRODUCING → CONFIRMED`
+2. 재고 차감은 이 시점이 아닌 **출고 시점**에 수행
 
 #### 생산 현황 표기
 

@@ -3,7 +3,8 @@
 가상의 반도체 회사 "S-Semi"의 시료(Sample) 생산주문관리 시스템.
 콘솔 기반 C++ 애플리케이션으로, MVC 패턴 + JSON 파일 영속성을 사용한다.
 
-> 기능 명세 및 도메인 모델 상세: [PRD.md](PRD.md)
+> 기능 명세 및 도메인 모델 상세: [docs/PRD.md](docs/PRD.md)
+> Phase별 설계 문서: [docs/design/](docs/design/) — phase1~4b 각 폴더에 model.md / mvc.md 수록
 
 ---
 
@@ -42,34 +43,17 @@ Debug 빌드를 실행하면 자동으로 GTest 테스트가 수행된다.
 ```
 SampleOrderSystem-jsjason/          ← git 저장소 루트
 ├── CLAUDE.md
-├── PRD.md                          ← 기능 명세 / 도메인 모델
+├── docs/
+│   ├── PRD.md                      ← 기능 명세 / 도메인 모델
+│   └── design/                     ← Phase별 설계 문서
 ├── SampleOrderSystem-jsjason.slnx  ← Visual Studio 솔루션
 └── SampleOrderSystem-jsjason/      ← C++ 프로젝트 디렉터리
     ├── main.cpp                    ← 진입점. Debug: 테스트 실행 / Release: 앱 실행
-    ├── json.h                      ← 헤더 전용 JSON 파서/직렬화기 (외부 의존성 없음)
-    ├── Model/
-    │   ├── Sample.h/.cpp           ← 시료 엔티티 + SampleRepository
-    │   ├── Order.h/.cpp            ← 주문 엔티티 (OrderStatus enum) + OrderRepository
-    │   └── ProductionQueue.h/.cpp  ← 생산 큐 (FIFO) + 생산량 계산 로직
-    ├── View/
-    │   ├── MainView.h/.cpp         ← 메인 메뉴, 시스템 현황 요약
-    │   ├── SampleView.h/.cpp       ← 시료 관리 화면
-    │   ├── OrderView.h/.cpp        ← 주문 접수 / 승인·거절 화면
-    │   ├── MonitorView.h/.cpp      ← 모니터링 대시보드
-    │   ├── ProductionView.h/.cpp   ← 생산라인 현황 화면
-    │   └── ReleaseView.h/.cpp      ← 출고 처리 화면
-    ├── Controller/
-    │   ├── AppController.h/.cpp    ← 메인 루프, 메뉴 라우팅
-    │   ├── SampleController.h/.cpp ← 시료 등록·조회·검색
-    │   ├── OrderController.h/.cpp  ← 주문 접수, 승인/거절, 재고 판단
-    │   ├── MonitorController.h/.cpp← 모니터링 조회
-    │   ├── ProductionController.h/.cpp ← 생산라인 조회, 생산 완료 처리
-    │   └── ReleaseController.h/.cpp    ← 출고 처리
-    └── Tests/
-        ├── SampleRepositoryTest.cpp
-        ├── OrderRepositoryTest.cpp
-        ├── ProductionQueueTest.cpp
-        └── OrderApprovalTest.cpp
+    ├── json.h                      ← 헤더 전용 JSON 파서/직렬화기
+    ├── Model/                      ← 엔티티 구조체 + Repository (Sample, Order, ProductionQueue)
+    ├── View/                       ← 콘솔 렌더링 + 입력 수집 (도메인별 View + ConsoleColor.h)
+    ├── Controller/                 ← 비즈니스 로직 (AppController + 도메인별 Controller)
+    └── Tests/                      ← GTest 단위 테스트 (48개)
 ```
 
 ---
@@ -87,14 +71,14 @@ SampleOrderSystem-jsjason/          ← git 저장소 루트
 
 콘솔 렌더링과 사용자 입력 수집만 담당. 비즈니스 로직 없음.
 
-- `Show*()` 메서드: 화면 출력
-- `Prompt*()` 메서드: 사용자 입력 수집
+- `show*()` 메서드: 화면 출력
+- `prompt*()` 메서드: 사용자 입력 수집
 
 ### Controller
 
 Model과 View를 연결. 입력 → 비즈니스 로직 → 결과 표시.
 
-- `AppController::Run()` — 최상위 메뉴 루프
+- `AppController::run()` — 최상위 메뉴 루프
 - 각 도메인 Controller가 하위 메뉴 루프 처리
 
 ### main.cpp
@@ -107,11 +91,30 @@ Model과 View를 연결. 입력 → 비즈니스 로직 → 결과 표시.
 return RUN_ALL_TESTS();
 
 // Release: 앱 실행
-SampleRepository    sampleRepo("data/samples.json");
-OrderRepository     orderRepo("data/orders.json");
-ProductionQueue     prodQueue("data/production.json");
-AppController app(sampleRepo, orderRepo, prodQueue, ...);
-app.Run();
+SampleRepository     sampleRepo("data/samples.json");
+OrderRepository      orderRepo("data/orders.json");
+ProductionQueue      prodQueue("data/production.json");
+
+SampleView           sampleView;
+SampleController     sampleCtrl(sampleRepo, orderRepo, prodQueue, sampleView);
+
+OrderView            orderView;
+OrderController      orderCtrl(sampleRepo, orderRepo, prodQueue, orderView);
+
+ProductionView       productionView;
+ProductionController productionCtrl(sampleRepo, orderRepo, prodQueue, productionView);
+
+ReleaseView          releaseView;
+ReleaseController    releaseCtrl(sampleRepo, orderRepo, releaseView);
+
+MonitorView          monitorView;
+MonitorController    monitorCtrl(sampleRepo, orderRepo, prodQueue, monitorView);
+
+MainView             mainView;
+AppController        app(sampleRepo, orderRepo, prodQueue,
+                         sampleCtrl, orderCtrl, productionCtrl,
+                         releaseCtrl, monitorCtrl, mainView);
+app.run();
 ```
 
 ---
