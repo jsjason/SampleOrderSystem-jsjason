@@ -279,23 +279,18 @@ totalDuration     = 0.01 × 10 × 60 = 6초
 
 ---
 
-## Phase 4 — 모니터링 + 출고 처리 + 메인 현황 완성
+## Phase 4a — 출고 처리
 
 ### 목표
-전체 시스템을 완성한다. 모니터링으로 주문 현황과 재고 상태를 한눈에 확인하고,
 `CONFIRMED` 주문을 출고(`RELEASED`)로 처리할 수 있다.
-메인 메뉴의 현황 요약(시료 수, 총 재고, 주문 수, 생산 대기)도 완성한다.
 
 ### 구현 대상
 
 | 파일 | 내용 |
 |------|------|
-| `Controller/MonitorController.h/.cpp` | 상태별 주문 건수 집계, 시료별 재고 상태(여유/부족/고갈) 판단 |
-| `View/MonitorView.h/.cpp` | 주문 현황 + 재고 현황 대시보드 출력 |
 | `Controller/ReleaseController.h/.cpp` | `CONFIRMED` 주문 목록 표시 → 선택 → `RELEASED` 전환 |
 | `View/ReleaseView.h/.cpp` | 출고 가능 주문 목록, 출고 처리 결과 출력 |
-| `View/MainView` (수정) | 현황 요약 출력 (등록 시료 수, 총 재고, 전체 주문 수, 생산 대기) |
-| `Controller/AppController` (수정) | [4] 모니터링, [6] 출고 처리 메뉴 연결, 현황 데이터 전달 |
+| `Controller/AppController` (수정) | [6] 출고 처리 메뉴 연결 |
 
 ### 통과 단위 테스트 (1개)
 
@@ -306,15 +301,40 @@ totalDuration     = 0.01 × 10 × 60 = 6초
 ### 수동 테스트 시나리오 (Release 빌드)
 
 ```
-[모니터링]
-1. 여러 주문을 다양한 상태로 만든 뒤 [4] 모니터링 진입
-2. 상태별 주문 건수 (RESERVED/CONFIRMED/PRODUCING/RELEASED) 확인
-3. 시료별 재고 상태 (여유/부족/고갈) 표기 확인
-
 [출고 처리]
 1. CONFIRMED 상태 주문이 있는 상태에서 [6] 출고 처리 진입
 2. CONFIRMED 목록 확인 후 특정 주문 선택
 3. 출고 처리 후 상태 CONFIRMED → RELEASED 전환 확인
+```
+
+---
+
+## Phase 4b — 모니터링 + 메인 현황 완성
+
+### 목표
+전체 시스템을 완성한다. 모니터링으로 주문 현황과 재고 상태를 한눈에 확인할 수 있고,
+메인 메뉴의 현황 요약(시료 수, 총 재고, 주문 수, 생산 대기)도 완성한다.
+
+### 구현 대상
+
+| 파일 | 내용 |
+|------|------|
+| `Controller/MonitorController.h/.cpp` | 상태별 주문 건수 집계, 시료별 재고 상태(여유/부족/고갈) 판단 |
+| `View/MonitorView.h/.cpp` | 주문 현황 + 재고 현황 대시보드 출력 |
+| `View/MainView` (수정) | 현황 요약 출력 (등록 시료 수, 총 재고, 전체 주문 수, 생산 대기) |
+| `Controller/AppController` (수정) | [4] 모니터링 메뉴 연결, 현황 데이터 전달 |
+
+### 통과 단위 테스트
+
+없음 (UI 전용 기능).
+
+### 수동 테스트 시나리오 (Release 빌드)
+
+```
+[모니터링]
+1. 여러 주문을 다양한 상태로 만든 뒤 [4] 모니터링 진입
+2. 상태별 주문 건수 (RESERVED/CONFIRMED/PRODUCING/RELEASED) 확인
+3. 시료별 재고 상태 (여유/부족/고갈) 표기 확인
 
 [메인 현황 요약]
 1. 메인 메뉴 상단에 현재 시료 수, 총 재고, 전체 주문 수, 생산 대기 수 표시 확인
@@ -330,6 +350,7 @@ totalDuration     = 0.01 × 10 × 60 = 6초
 | Phase 2  | OrderRepository 6개 | **16 / 46** |
 | Phase 3a | OrderRepository 5개 + ProductionQueue 5개 + OrderApproval 9개 | **35 / 46** |
 | Phase 3b | ProductionCalculation 4개 + ProductionQueue(자동완료) 3개 + OrderApproval(생산완료+재고선점) 5개 | **47 / 48** |
-| Phase 4  | OrderApproval 1개 | **48 / 48** |
+| Phase 4a | OrderApproval 1개 | **48 / 48** |
+| Phase 4b | (없음) | **48 / 48** |
 
-Phase 4 완료 시 전체 48개 테스트 PASS, 0개 SKIPPED.
+Phase 4b 완료 시 전체 48개 테스트 PASS, 0개 SKIPPED.
