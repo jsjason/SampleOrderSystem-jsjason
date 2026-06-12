@@ -1,3 +1,5 @@
+> **이 파일은 [CLAUDE.md](CLAUDE.md)와 내용이 동일합니다.**
+
 # SampleOrderSystem-jsjason
 
 가상의 반도체 회사 "S-Semi"의 시료(Sample) 생산주문관리 시스템.
@@ -43,7 +45,6 @@ Debug 빌드를 실행하면 자동으로 GTest 테스트가 수행된다.
 ```
 SampleOrderSystem-jsjason/          ← git 저장소 루트
 ├── CLAUDE.md
-├── README.md                       ← CLAUDE.md와 동일 (GitHub 표시용)
 ├── docs/
 │   ├── PRD.md                      ← 기능 명세 / 도메인 모델
 │   └── design/                     ← Phase별 설계 문서
